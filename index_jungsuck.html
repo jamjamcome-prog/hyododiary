@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>효도일기</title>
+
+<!--
+  ====================== 설정 안내 (전부 무료) ======================
+  1) console.firebase.google.com 접속 → "프로젝트 추가" → 이름 입력 → 만들기
+  2) 왼쪽 메뉴 Build > Firestore Database → "데이터베이스 만들기"
+     → "테스트 모드로 시작" 선택 → 리전은 asia-northeast3(서울) 있으면 선택 → 사용 설정
+  3) Firestore "규칙(Rules)" 탭에서 아래 내용으로 바꾸고 "게시(Publish)":
+
+     rules_version = '2';
+     service cloud.firestore {
+       match /databases/{database}/documents {
+         match /{document=**} {
+           allow read, write: if true;
+         }
+       }
+     }
+
+     (테스트 모드 기본값은 30일 뒤 자동으로 잠기니, 위 규칙으로 명시적으로 열어두는 걸 추천해요.
+      링크를 아는 사람만 접근한다는 전제의 가족용 앱이라 이 정도로 충분해요.)
+
+  4) 프로젝트 설정(왼쪽 위 톱니바퀴) → "일반" 탭 → 아래로 스크롤 → "내 앱"에서
+     </> (웹) 아이콘 클릭 → 앱 닉네임 입력 → "앱 등록"
+     → firebaseConfig = { apiKey: ..., authDomain: ..., ... } 객체가 나오면
+       아래 firebaseConfig 자리에 그대로 붙여넣으세요.
+  5) 저장 후 이 파일을 GitHub에 올리고 Vercel로 배포하면 끝이에요.
+
+  * Firestore, Hosting 모두 무료(Spark) 요금제 범위 안에서 충분히 쓸 수 있는
+    가족용 규모예요. 신용카드 등록도 필요 없어요.
+  =====================================================================
+-->
+
+<style>
+  :root{
+    --paper: #EAE2D0;
+    --paper-deep: #DED4BC;
+    --card: #F8F4E9;
+    --ink: #2E2A22;
+    --ink-soft: #6b6455;
+    --persimmon: #A8583B;
+    --persimmon-deep: #8B472F;
+    --sage: #6E7A57;
+    --brass: #B79962;
+    --line: rgba(46,42,34,0.14);
+    --font-display: "Nanum Myeongjo", "Noto Serif KR", "Batang", serif;
+    --font-body: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{background:var(--paper-deep);}
+  body{ font-family: var(--font-body); color: var(--ink); display:flex; justify-content:center; }
+  .app{
+    width:100%; max-width:430px; background:var(--paper);
+    min-height:100vh; position:relative; overflow-x:hidden;
+    box-shadow: 0 0 40px rgba(0,0,0,0.15);
+  }
+
+  .setup-banner{
+    background:#5b3b2b; color:#f6ede0; font-size:11.5px; line-height:1.7;
+    padding:14px 18px; text-align:center; display:none;
+  }
+  .setup-banner.show{ display:block; }
+
+  .hero{
+    min-height:100vh; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; text-align:center; padding:56px 32px 40px; position:relative;
+  }
+  .hero::before{ content:""; position:absolute; inset:18px; border:1px solid var(--brass); opacity:0.55; pointer-events:none; }
+  .hero-frame{
+    width:132px; height:132px; border-radius:50%;
+    background: radial-gradient(circle at 35% 30%, #fff, var(--card) 55%, var(--paper-deep) 100%);
+    border:1px solid var(--brass); display:flex; align-items:center; justify-content:center; margin-bottom:26px;
+    overflow:hidden;
+  }
+  .hero-frame svg{ width:58px; height:58px; opacity:0.75; }
+  .hero-frame img{ width:100%; height:100%; object-fit:cover; }
+  .hero-eyebrow{ font-family: var(--font-display); font-size:15px; color:var(--ink-soft); letter-spacing:0.06em; margin-bottom:14px; }
+  .hero-title{ font-family: var(--font-display); font-size:29px; line-height:1.55; font-weight:700; color:var(--ink); }
+  .hero-title .amp{ display:block; font-size:16px; color:var(--persimmon); margin:6px 0; font-family: var(--font-body); }
+  .hero-sub{ margin-top:22px; font-size:13.5px; color:var(--ink-soft); line-height:1.8; max-width:280px; }
+  .hero-since{ margin-top:30px; font-size:12px; letter-spacing:0.08em; color:var(--brass); border-top:1px solid var(--line); padding-top:16px; }
+  .scroll-cue{ position:absolute; bottom:28px; left:50%; transform:translateX(-50%); font-size:11px; color:var(--ink-soft); display:flex; flex-direction:column; align-items:center; gap:6px; }
+  .scroll-cue span{ width:1px; height:26px; background:var(--ink-soft); opacity:0.4; animation: dropcue 1.8s ease-in-out infinite; }
+  @keyframes dropcue{ 0%{ transform:scaleY(0); transform-origin:top;} 50%{ transform:scaleY(1); transform-origin:top;} 51%{ transform-origin:bottom;} 100%{ transform:scaleY(0); transform-origin:bottom;} }
+
+  section{ padding:64px 30px; }
+  .section-title{ font-family: var(--font-display); font-size:21px; text-align:center; margin-bottom:8px; }
+  .section-desc{ text-align:center; font-size:12.5px; color:var(--ink-soft); line-height:1.7; margin-bottom:34px; }
+  .divider{ width:34px; height:1px; background:var(--brass); margin:0 auto 34px; }
+
+  .greeting{ background:var(--paper); }
+  .greeting p{ font-size:14.5px; line-height:2.05; color:var(--ink); text-align:center; }
+  .greeting .signoff{ margin-top:22px; font-family: var(--font-display); font-size:14px; color:var(--persimmon-deep); }
+
+  .dday{ background:var(--paper-deep); text-align:center; }
+  .dday-number{ font-family: var(--font-display); font-size:52px; color:var(--persimmon); line-height:1; }
+  .dday-label{ margin-top:10px; font-size:13px; color:var(--ink-soft); }
+  .dday-start{ margin-top:20px; font-size:11.5px; color:var(--ink-soft); }
+  .dday-start input{ background:transparent; border:none; border-bottom:1px solid var(--brass); font-family: var(--font-body); font-size:11.5px; color:var(--ink); text-align:center; padding:2px 4px; }
+
+  .timeline{ background:var(--paper); }
+  .timeline-list{ position:relative; padding-left:22px; }
+  .timeline-list::before{ content:""; position:absolute; left:5px; top:4px; bottom:4px; width:1px; background:var(--line); }
+  .entry{ position:relative; margin-bottom:26px; background:var(--card); border:1px solid var(--line); border-radius:2px; padding:16px 16px 14px; }
+  .entry::before{ content:""; position:absolute; left:-22px; top:20px; width:9px; height:9px; border-radius:50%; background:var(--persimmon); border:2px solid var(--paper); }
+  .entry-top{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px; }
+  .entry-date{ font-family: var(--font-display); font-size:15px; color:var(--persimmon-deep); white-space:nowrap; }
+  .entry-tag{ font-size:10.5px; color:var(--sage); border:1px solid var(--sage); border-radius:20px; padding:2px 9px; white-space:nowrap; }
+  .entry-author{ font-size:11px; color:var(--ink-soft); margin-bottom:6px; }
+  .entry-text{ font-size:13.5px; line-height:1.75; color:var(--ink); white-space:pre-wrap; }
+  .entry-mood{ font-size:13px; margin-top:8px; }
+  .entry-photo{ margin-top:10px; width:100%; max-height:220px; object-fit:cover; border-radius:2px; border:1px solid var(--line); }
+  .entry-actions{ margin-top:10px; display:flex; gap:12px; }
+  .entry-actions button{ background:none; border:none; font-size:11px; color:var(--ink-soft); text-decoration:underline; cursor:pointer; padding:0; }
+  .empty-state{ text-align:center; color:var(--ink-soft); font-size:13px; padding:20px 10px; line-height:1.8; }
+
+  .guestbook{ background:var(--paper-deep); }
+  .gb-form input, .gb-form textarea{ width:100%; background:var(--card); border:1px solid var(--line); border-radius:2px; padding:10px 12px; font-family:var(--font-body); font-size:13px; color:var(--ink); margin-bottom:10px; }
+  .gb-form textarea{ min-height:70px; resize:vertical; }
+  .gb-row{ display:flex; gap:10px; }
+  .gb-row input{ flex:1; }
+  .gb-form{ margin-bottom:30px; }
+  .gb-list .gb-item{ background:var(--card); border:1px solid var(--line); padding:14px 16px; margin-bottom:12px; border-radius:2px; }
+  .gb-name{ font-family: var(--font-display); font-size:13.5px; color:var(--persimmon-deep); margin-bottom:5px; }
+  .gb-msg{ font-size:13px; line-height:1.65; }
+  .gb-note{ font-size:11px; color:var(--ink-soft); text-align:center; margin-top:-16px; margin-bottom:26px; }
+
+  .btn{ display:block; width:100%; text-align:center; background:var(--persimmon); color:#fff; border:none; border-radius:2px; padding:12px; font-size:13.5px; font-family:var(--font-body); cursor:pointer; letter-spacing:0.02em; }
+  .btn:active{ background:var(--persimmon-deep); }
+  .btn-outline{ background:transparent; color:var(--persimmon-deep); border:1px solid var(--persimmon-deep); }
+
+  .footer{ background:var(--paper); text-align:center; padding:56px 30px 40px; }
+  .footer-title{ font-family: var(--font-display); font-size:17px; margin-bottom:14px; }
+  .footer-text{ font-size:12.5px; color:var(--ink-soft); line-height:1.8; margin-bottom:26px; }
+  .reset-link{ display:inline-block; margin-top:28px; font-size:11px; color:var(--ink-soft); text-decoration:underline; cursor:pointer; opacity:0.7; }
+
+  .fab{
+    position:fixed; bottom:26px; right:22px;
+    width:54px; height:54px; border-radius:50%;
+    background:var(--persimmon); color:#fff; border:none; font-size:26px;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 6px 18px rgba(168,88,59,0.4); cursor:pointer; z-index:40;
+  }
+  @media (min-width:431px){ .fab{ right:calc(50% - 191px); } }
+
+  .modal-backdrop{ position:fixed; inset:0; background:rgba(46,42,34,0.5); display:none; align-items:flex-end; justify-content:center; z-index:50; }
+  .modal-backdrop.open{ display:flex; }
+  .modal{ width:100%; max-width:430px; background:var(--paper); border-radius:14px 14px 0 0; padding:26px 26px 30px; max-height:88vh; overflow-y:auto; position:relative; }
+  .modal h3{ font-family:var(--font-display); font-size:18px; margin-bottom:18px; text-align:center; }
+  .field-label{ font-size:11.5px; color:var(--ink-soft); margin-bottom:6px; display:block; }
+  .field{ margin-bottom:16px; }
+  .field-row{ display:flex; gap:10px; }
+  .field-row .field{ flex:1; }
+  .field input, .field select, .field textarea{ width:100%; background:var(--card); border:1px solid var(--line); border-radius:2px; padding:10px 12px; font-family:var(--font-body); font-size:13.5px; color:var(--ink); }
+  .field textarea{ min-height:80px; resize:vertical; }
+  .mood-row{ display:flex; gap:8px; flex-wrap:wrap; }
+  .mood-btn{ border:1px solid var(--line); background:var(--card); border-radius:20px; padding:7px 12px; font-size:15px; cursor:pointer; }
+  .mood-btn.active{ border-color:var(--persimmon); background:#f1e3d8; }
+  .field-hint{ font-size:10.5px; color:var(--ink-soft); margin-top:4px; }
+  .modal-actions{ display:flex; gap:10px; margin-top:6px; }
+  .modal-actions .btn{ flex:1; }
+  .close-x{ position:absolute; top:14px; right:20px; background:none; border:none; font-size:20px; color:var(--ink-soft); cursor:pointer; }
+
+  .loading{ text-align:center; color:var(--ink-soft); font-size:12.5px; padding:20px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="setup-banner" id="setupBanner">
+    ⚠ Firebase 연결이 아직 안 돼 있어요. 코드 상단의 firebaseConfig를 채워주셔야 실제 저장이 됩니다. (지금은 미리보기 상태예요)
+  </div>
+
+  <div class="hero">
+    <div class="hero-frame">
+      <img src="grandmother.jpg" alt="김정숙어머님">
+    </div>
+    <div class="hero-eyebrow">우리 가족의 작은 기록</div>
+    <div class="hero-title">김정숙어머님을 위한<span class="amp">효도일기</span></div>
+    <p class="hero-sub">전화 한 통, 방문 한 번, 사진 한 장을 가족 모두가<br>이 페이지에 함께 남깁니다.</p>
+    <div class="hero-since" id="heroSince">기록 시작일 불러오는 중…</div>
+    <div class="scroll-cue"><span></span>아래로 내려보세요</div>
+  </div>
+
+  <section class="greeting">
+    <div class="section-title">인사말</div>
+    <div class="divider"></div>
+    <p>낳아주시고 길러주신 은혜, 말로 다 갚을 수 없지만<br>
+    작은 안부와 방문 하나하나를 이곳에 남기려 합니다.<br><br>
+    이 링크는 가족 누구나 로그인 없이 들어와서<br>
+    자유롭게 기록을 남기고 볼 수 있어요.</p>
+    <div class="signoff">— 가족 일동 드림</div>
+  </section>
+
+  <section class="dday">
+    <div class="section-title">함께한 시간</div>
+    <div class="divider"></div>
+    <div class="dday-number" id="ddayNumber">-</div>
+    <div class="dday-label">일째, 마음을 기록하고 있어요</div>
+    <div class="dday-start">기록 시작일 &nbsp;<input type="date" id="startDateInput"></div>
+  </section>
+
+  <section class="timeline">
+    <div class="section-title">효도 다이어리</div>
+    <div class="section-desc">전화, 방문, 식사, 병원 동행까지<br>김정숙어머님과 함께한 하루하루를 남겨요.</div>
+    <div class="timeline-list" id="timelineList"><div class="loading">불러오는 중…</div></div>
+  </section>
+
+  <section class="guestbook">
+    <div class="section-title">가족 한마디</div>
+    <div class="divider"></div>
+    <div class="gb-form">
+      <div class="gb-row">
+        <input type="text" id="gbName" placeholder="이름 (예: 큰딸, 막내)">
+        <input type="text" id="gbPin" placeholder="비밀번호 4자리" maxlength="4" inputmode="numeric" style="max-width:110px;">
+      </div>
+      <textarea id="gbMsg" placeholder="김정숙어머님께, 혹은 가족에게 남기는 한마디"></textarea>
+      <button class="btn" id="gbSubmit">남기기</button>
+    </div>
+    <div class="gb-note">* 이 방명록은 링크를 아는 가족 누구에게나 공개돼요. 삭제 시 작성할 때 쓴 비밀번호가 필요해요.</div>
+    <div class="gb-list" id="gbList"><div class="loading">불러오는 중…</div></div>
+  </section>
+
+  <div class="footer">
+    <div class="footer-title">오늘도, 감사합니다</div>
+    <p class="footer-text">이 페이지 링크를 가족에게 공유해<br>모두가 함께 기록을 이어갈 수 있어요.</p>
+    <button class="btn btn-outline" id="shareBtn">가족에게 링크 공유하기</button>
+    <div class="reset-link" id="resetLink">다이어리 기록 전체 초기화</div>
+  </div>
+
+  <button class="fab" id="fabAdd">＋</button>
+
+  <div class="modal-backdrop" id="modalBackdrop">
+    <div class="modal">
+      <button class="close-x" id="modalClose">×</button>
+      <h3 id="modalTitle">오늘의 기록 남기기</h3>
+      <div class="field-row">
+        <div class="field">
+          <span class="field-label">이름</span>
+          <input type="text" id="entryAuthor" placeholder="예: 큰아들">
+        </div>
+        <div class="field">
+          <span class="field-label">비밀번호 4자리</span>
+          <input type="text" id="entryPin" maxlength="4" inputmode="numeric" placeholder="수정·삭제용">
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">날짜</span>
+        <input type="date" id="entryDate">
+      </div>
+      <div class="field">
+        <span class="field-label">어떤 시간이었나요</span>
+        <select id="entryTag">
+          <option value="전화">전화 통화</option>
+          <option value="방문">방문</option>
+          <option value="식사">함께 식사</option>
+          <option value="병원동행">병원 동행</option>
+          <option value="선물">선물 · 용돈</option>
+          <option value="기타">기타</option>
+        </select>
+      </div>
+      <div class="field">
+        <span class="field-label">오늘의 기분</span>
+        <div class="mood-row" id="moodRow">
+          <button type="button" class="mood-btn" data-mood="😊">😊</button>
+          <button type="button" class="mood-btn" data-mood="🥰">🥰</button>
+          <button type="button" class="mood-btn" data-mood="🥲">🥲</button>
+          <button type="button" class="mood-btn" data-mood="😌">😌</button>
+          <button type="button" class="mood-btn" data-mood="🙏">🙏</button>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">내용</span>
+        <textarea id="entryText" placeholder="오늘 김정숙어머님과 나눈 이야기를 적어보세요"></textarea>
+      </div>
+      <div class="field">
+        <span class="field-label">사진 (선택)</span>
+        <input type="file" id="entryPhoto" accept="image/*">
+        <div class="field-hint">용량이 큰 사진은 자동으로 거절돼요 (1.5MB 이하 권장)</div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="modalCancel">취소</button>
+        <button class="btn" id="modalSave">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="pinBackdrop">
+    <div class="modal">
+      <button class="close-x" id="pinClose">×</button>
+      <h3>비밀번호 확인</h3>
+      <div class="field">
+        <span class="field-label">작성할 때 입력한 4자리 비밀번호</span>
+        <input type="text" id="pinCheckInput" maxlength="4" inputmode="numeric">
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" id="pinCancel">취소</button>
+        <button class="btn" id="pinConfirm">확인</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+  import {
+    getFirestore, collection, addDoc, updateDoc, deleteDoc, doc,
+    getDocs, query, orderBy
+  } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+  // ====== 여기에 Firebase 콘솔에서 복사한 firebaseConfig를 붙여넣으세요 ======
+  const firebaseConfig = {
+    apiKey: "AIzaSyCimNeP1hqY8t5Lp56kqls24g31cYClmRk",
+    authDomain: "hyodo-dary.firebaseapp.com",
+    projectId: "hyodo-dary",
+    storageBucket: "hyodo-dary.firebasestorage.app",
+    messagingSenderId: "316098878494",
+    appId: "1:316098878494:web:b2c53ec0fbcbee8a37e20f"
+  };
+  // =========================================================================
+
+  const configured = firebaseConfig.apiKey && !firebaseConfig.apiKey.startsWith("YOUR_");
+  let db = null;
+  if(configured){
+    const app = initializeApp(firebaseConfig);
+    db = getFirestore(app);
+  } else {
+    document.getElementById("setupBanner").classList.add("show");
+  }
+
+  let entries = [];
+  let guestbook = [];
+  let selectedMood = "";
+  let editingEntryId = null;
+  let pendingPinAction = null;
+
+  const timelineList = document.getElementById("timelineList");
+  const gbList = document.getElementById("gbList");
+  const ddayNumber = document.getElementById("ddayNumber");
+  const heroSince = document.getElementById("heroSince");
+  const startDateInput = document.getElementById("startDateInput");
+
+  function fmtDate(d){
+    const dt = new Date(d);
+    return `${dt.getFullYear()}.${String(dt.getMonth()+1).padStart(2,"0")}.${String(dt.getDate()).padStart(2,"0")}`;
+  }
+  function todayStr(){ return new Date().toISOString().slice(0,10); }
+  function escapeHtml(str){ const div = document.createElement("div"); div.textContent = str; return div.innerHTML; }
+
+  async function loadAll(){
+    startDateInput.value = todayStr();
+    renderDday();
+
+    if(!db){
+      timelineList.innerHTML = `<div class="empty-state">Firebase 연결 전이라 미리보기만 가능해요.</div>`;
+      gbList.innerHTML = `<div class="empty-state">Firebase 연결 전이라 미리보기만 가능해요.</div>`;
+      return;
+    }
+
+    try{
+      const q1 = query(collection(db, "diaryEntries"), orderBy("entryDate", "desc"));
+      const snap1 = await getDocs(q1);
+      entries = snap1.docs.map(d => ({ id: d.id, ...d.data() }));
+    }catch(e){ console.error(e); entries = []; }
+
+    try{
+      const q2 = query(collection(db, "guestbook"), orderBy("createdAt", "desc"));
+      const snap2 = await getDocs(q2);
+      guestbook = snap2.docs.map(d => ({ id: d.id, ...d.data() }));
+    }catch(e){ console.error(e); guestbook = []; }
+
+    renderEntries();
+    renderGuestbook();
+  }
+
+  function renderDday(){
+    heroSince.textContent = `${fmtDate(startDateInput.value)} 부터 기록 중`;
+    const start = new Date(startDateInput.value);
+    const now = new Date();
+    const diff = Math.max(1, Math.floor((now - start)/86400000) + 1);
+    ddayNumber.textContent = diff;
+  }
+
+  function renderEntries(){
+    if(!entries.length){
+      timelineList.innerHTML = `<div class="empty-state">아직 기록이 없어요.<br>오른쪽 아래 ＋ 버튼으로 첫 기록을 남겨보세요.</div>`;
+      return;
+    }
+    timelineList.innerHTML = entries.map(e => `
+      <div class="entry" data-id="${e.id}">
+        <div class="entry-top">
+          <span class="entry-date">${fmtDate(e.entryDate)}</span>
+          <span class="entry-tag">${escapeHtml(e.tag || "")}</span>
+        </div>
+        <div class="entry-author">${escapeHtml(e.authorName)}</div>
+        <div class="entry-text">${escapeHtml(e.content || "")}</div>
+        ${e.mood ? `<div class="entry-mood">${e.mood}</div>` : ""}
+        ${e.photoUrl ? `<img class="entry-photo" src="${e.photoUrl}">` : ""}
+        <div class="entry-actions">
+          <button data-action="edit" data-id="${e.id}">수정</button>
+          <button data-action="delete" data-id="${e.id}">삭제</button>
+        </div>
+      </div>
+    `).join("");
+  }
+
+  function renderGuestbook(){
+    if(!guestbook.length){
+      gbList.innerHTML = `<div class="empty-state">아직 남긴 한마디가 없어요.</div>`;
+      return;
+    }
+    gbList.innerHTML = guestbook.map(g => `
+      <div class="gb-item" data-id="${g.id}">
+        <div class="gb-name">${escapeHtml(g.authorName)}</div>
+        <div class="gb-msg">${escapeHtml(g.message)}</div>
+        <div class="entry-actions">
+          <button data-action="gbdelete" data-id="${g.id}">삭제</button>
+        </div>
+      </div>
+    `).join("");
+  }
+
+  const modalBackdrop = document.getElementById("modalBackdrop");
+  const modalTitle = document.getElementById("modalTitle");
+  const entryAuthor = document.getElementById("entryAuthor");
+  const entryPin = document.getElementById("entryPin");
+  const entryDate = document.getElementById("entryDate");
+  const entryTag = document.getElementById("entryTag");
+  const entryText = document.getElementById("entryText");
+  const entryPhoto = document.getElementById("entryPhoto");
+  const moodRow = document.getElementById("moodRow");
+
+  function openAddModal(){
+    editingEntryId = null;
+    modalTitle.textContent = "오늘의 기록 남기기";
+    entryAuthor.value = ""; entryPin.value = "";
+    entryDate.value = todayStr();
+    entryText.value = ""; entryPhoto.value = "";
+    selectedMood = "";
+    [...moodRow.children].forEach(b => b.classList.remove("active"));
+    modalBackdrop.classList.add("open");
+  }
+  function openEditModal(entry){
+    editingEntryId = entry.id;
+    modalTitle.textContent = "기록 수정하기";
+    entryAuthor.value = entry.authorName;
+    entryPin.value = entry.pin;
+    entryDate.value = entry.entryDate;
+    entryTag.value = entry.tag;
+    entryText.value = entry.content;
+    selectedMood = entry.mood || "";
+    [...moodRow.children].forEach(b => b.classList.toggle("active", b.dataset.mood === selectedMood));
+    modalBackdrop.classList.add("open");
+  }
+  function closeModal(){ modalBackdrop.classList.remove("open"); }
+
+  document.getElementById("fabAdd").onclick = openAddModal;
+  document.getElementById("modalClose").onclick = closeModal;
+  document.getElementById("modalCancel").onclick = closeModal;
+  modalBackdrop.onclick = (e) => { if(e.target === modalBackdrop) closeModal(); };
+
+  moodRow.addEventListener("click", (e) => {
+    const btn = e.target.closest(".mood-btn");
+    if(!btn) return;
+    [...moodRow.children].forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    selectedMood = btn.dataset.mood;
+  });
+
+  document.getElementById("modalSave").onclick = async () => {
+    if(!db){ alert("Firebase 연결 전이라 저장은 안 돼요. 코드 상단 설정을 먼저 채워주세요."); return; }
+    if(!entryAuthor.value.trim() || entryPin.value.trim().length !== 4 || !entryText.value.trim()){
+      alert("이름, 4자리 비밀번호, 내용을 모두 입력해주세요.");
+      return;
+    }
+    const doSave = async (photoDataUrl) => {
+      const payload = {
+        entryDate: entryDate.value || todayStr(),
+        tag: entryTag.value,
+        content: entryText.value.trim(),
+        mood: selectedMood,
+        authorName: entryAuthor.value.trim(),
+        pin: entryPin.value.trim(),
+      };
+      if(photoDataUrl !== undefined) payload.photoUrl = photoDataUrl;
+
+      if(editingEntryId){
+        await updateDoc(doc(db, "diaryEntries", editingEntryId), payload);
+      } else {
+        payload.photoUrl = photoDataUrl || null;
+        payload.createdAt = Date.now();
+        await addDoc(collection(db, "diaryEntries"), payload);
+      }
+      closeModal();
+      loadAll();
+    };
+
+    const file = entryPhoto.files[0];
+    if(file){
+      if(file.size > 1.5 * 1024 * 1024){
+        alert("사진 용량이 너무 커요. 1.5MB 이하 사진으로 선택해주세요.");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => doSave(reader.result);
+      reader.onerror = () => doSave(undefined);
+      reader.readAsDataURL(file);
+    } else {
+      doSave(editingEntryId ? undefined : null);
+    }
+  };
+
+  timelineList.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-action]");
+    if(!btn) return;
+    const id = btn.dataset.id;
+    const entry = entries.find(x => String(x.id) === String(id));
+    if(!entry) return;
+    pendingPinAction = { kind: "entry", type: btn.dataset.action, entry };
+    openPinModal();
+  });
+
+  gbList.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-action]");
+    if(!btn) return;
+    const id = btn.dataset.id;
+    const g = guestbook.find(x => String(x.id) === String(id));
+    if(!g) return;
+    pendingPinAction = { kind: "guestbook", type: "delete", entry: g };
+    openPinModal();
+  });
+
+  const pinBackdrop = document.getElementById("pinBackdrop");
+  const pinCheckInput = document.getElementById("pinCheckInput");
+  function openPinModal(){ pinCheckInput.value = ""; pinBackdrop.classList.add("open"); }
+  function closePinModal(){ pinBackdrop.classList.remove("open"); pendingPinAction = null; }
+  document.getElementById("pinClose").onclick = closePinModal;
+  document.getElementById("pinCancel").onclick = closePinModal;
+  pinBackdrop.onclick = (e) => { if(e.target === pinBackdrop) closePinModal(); };
+
+  document.getElementById("pinConfirm").onclick = async () => {
+    if(!pendingPinAction) return;
+    const { kind, type, entry } = pendingPinAction;
+    if(pinCheckInput.value.trim() !== String(entry.pin)){
+      alert("비밀번호가 맞지 않아요.");
+      return;
+    }
+    closePinModal();
+    if(kind === "entry"){
+      if(type === "delete"){
+        if(!confirm("이 기록을 삭제할까요?")) return;
+        await deleteDoc(doc(db, "diaryEntries", entry.id));
+        loadAll();
+      } else if(type === "edit"){
+        openEditModal(entry);
+      }
+    } else if(kind === "guestbook"){
+      if(!confirm("이 글을 삭제할까요?")) return;
+      await deleteDoc(doc(db, "guestbook", entry.id));
+      loadAll();
+    }
+  };
+
+  document.getElementById("gbSubmit").onclick = async () => {
+    if(!db){ alert("Firebase 연결 전이라 저장은 안 돼요."); return; }
+    const nameEl = document.getElementById("gbName");
+    const pinEl = document.getElementById("gbPin");
+    const msgEl = document.getElementById("gbMsg");
+    if(!nameEl.value.trim() || pinEl.value.trim().length !== 4 || !msgEl.value.trim()){
+      alert("이름, 4자리 비밀번호, 메시지를 모두 입력해주세요.");
+      return;
+    }
+    await addDoc(collection(db, "guestbook"), {
+      authorName: nameEl.value.trim(),
+      message: msgEl.value.trim(),
+      pin: pinEl.value.trim(),
+      createdAt: Date.now(),
+    });
+    nameEl.value = ""; pinEl.value = ""; msgEl.value = "";
+    loadAll();
+  };
+
+  startDateInput.addEventListener("change", () => { renderDday(); });
+
+  document.getElementById("shareBtn").onclick = async () => {
+    try{
+      await navigator.clipboard.writeText(window.location.href);
+      alert("링크가 복사됐어요. 가족에게 공유해보세요!");
+    }catch(e){
+      alert("이 미리보기 화면에서는 복사가 제한될 수 있어요. 실제 배포 후엔 정상 작동해요.");
+    }
+  };
+
+  document.getElementById("resetLink").onclick = async () => {
+    if(!db) return;
+    if(!confirm("가족 모두의 다이어리 기록을 전부 지울까요? 이 작업은 되돌릴 수 없어요.")) return;
+    const snap = await getDocs(collection(db, "diaryEntries"));
+    await Promise.all(snap.docs.map(d => deleteDoc(doc(db, "diaryEntries", d.id))));
+    loadAll();
+  };
+
+  loadAll();
+</script>
+</body>
+</html>
