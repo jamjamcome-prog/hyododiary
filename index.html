@@ -7,6 +7,12 @@
 
 <!--
   ====================== 설정 안내 (전부 무료) ======================
+  이 버전은 하나의 링크를 여러 가족이 함께 써요. 처음 들어온 사람이
+  "효도일기 새로 만들기" 화면에서 성함·호칭·사진을 입력하면, 그 사람만의
+  고유 링크(?f=xxxxxx)가 자동으로 생성되고, 그 가족의 기록은 다른 가족과
+  완전히 분리되어 저장돼요. 회원님은 아래 설정을 딱 한 번만 하면 되고,
+  그 이후로는 GitHub이나 Vercel을 다시 건드릴 필요가 없어요.
+
   1) console.firebase.google.com 접속 → "프로젝트 추가" → 이름 입력 → 만들기
   2) 왼쪽 메뉴 Build > Firestore Database → "데이터베이스 만들기"
      → "테스트 모드로 시작" 선택 → 리전은 asia-northeast3(서울) 있으면 선택 → 사용 설정
@@ -21,17 +27,16 @@
        }
      }
 
-     (테스트 모드 기본값은 30일 뒤 자동으로 잠기니, 위 규칙으로 명시적으로 열어두는 걸 추천해요.
-      링크를 아는 사람만 접근한다는 전제의 가족용 앱이라 이 정도로 충분해요.)
+     (이 규칙은 모든 하위 컬렉션(가족별 다이어리·방명록)에 그대로 적용되니
+      가족이 몇 명 늘어나도 규칙을 따로 바꿀 필요 없어요.)
 
   4) 프로젝트 설정(왼쪽 위 톱니바퀴) → "일반" 탭 → 아래로 스크롤 → "내 앱"에서
      </> (웹) 아이콘 클릭 → 앱 닉네임 입력 → "앱 등록"
-     → firebaseConfig = { apiKey: ..., authDomain: ..., ... } 객체가 나오면
-       아래 firebaseConfig 자리에 그대로 붙여넣으세요.
-  5) 저장 후 이 파일을 GitHub에 올리고 Vercel로 배포하면 끝이에요.
+     → firebaseConfig 객체가 나오면 아래 자리에 그대로 붙여넣으세요.
+  5) 저장 후 이 파일(index.html)을 GitHub에 올리고 Vercel로 배포하면 끝이에요.
 
-  * Firestore, Hosting 모두 무료(Spark) 요금제 범위 안에서 충분히 쓸 수 있는
-    가족용 규모예요. 신용카드 등록도 필요 없어요.
+  * Firestore, Hosting 모두 무료(Spark) 요금제 범위 안에서 충분히 쓸 수 있어요.
+    신용카드 등록도 필요 없어요.
   =====================================================================
 -->
 
@@ -74,7 +79,7 @@
     width:132px; height:132px; border-radius:50%;
     background: radial-gradient(circle at 35% 30%, #fff, var(--card) 55%, var(--paper-deep) 100%);
     border:1px solid var(--brass); display:flex; align-items:center; justify-content:center; margin-bottom:26px;
-    overflow:hidden;
+    overflow:hidden; flex-shrink:0;
   }
   .hero-frame svg{ width:58px; height:58px; opacity:0.75; }
   .hero-frame img{ width:100%; height:100%; object-fit:cover; }
@@ -136,7 +141,7 @@
   .footer{ background:var(--paper); text-align:center; padding:56px 30px 40px; }
   .footer-title{ font-family: var(--font-display); font-size:17px; margin-bottom:14px; }
   .footer-text{ font-size:12.5px; color:var(--ink-soft); line-height:1.8; margin-bottom:26px; }
-  .reset-link{ display:inline-block; margin-top:28px; font-size:11px; color:var(--ink-soft); text-decoration:underline; cursor:pointer; opacity:0.7; }
+  .reset-link{ display:inline-block; margin-top:14px; font-size:11px; color:var(--ink-soft); text-decoration:underline; cursor:pointer; opacity:0.7; }
 
   .fab{
     position:fixed; bottom:26px; right:22px;
@@ -166,6 +171,12 @@
   .close-x{ position:absolute; top:14px; right:20px; background:none; border:none; font-size:20px; color:var(--ink-soft); cursor:pointer; }
 
   .loading{ text-align:center; color:var(--ink-soft); font-size:12.5px; padding:20px; }
+
+  .create-form{ width:100%; max-width:280px; text-align:left; margin-top:8px; }
+  .not-found-notice{
+    background:#f1e3d8; border:1px solid var(--persimmon); color:var(--persimmon-deep);
+    font-size:12px; line-height:1.7; padding:12px 14px; border-radius:2px; margin-bottom:22px; display:none;
+  }
 </style>
 </head>
 <body>
@@ -175,141 +186,193 @@
     ⚠ Firebase 연결이 아직 안 돼 있어요. 코드 상단의 firebaseConfig를 채워주셔야 실제 저장이 됩니다. (지금은 미리보기 상태예요)
   </div>
 
-  <div class="hero">
+  <!-- ===== 새 효도일기 만들기 화면 ===== -->
+  <div class="hero" id="createScreen">
+    <div class="not-found-notice" id="notFoundNotice">이 링크에 해당하는 효도일기를 찾을 수 없어요. 아래에서 새로 만들어보세요.</div>
     <div class="hero-frame">
-      <img src="grandmother.jpg" alt="김정숙어머님">
+      <svg viewBox="0 0 64 64" fill="none" stroke="var(--persimmon-deep)" stroke-width="1.4">
+        <path d="M32 46c-9-6-16-12-16-20a9 9 0 0 1 16-6 9 9 0 0 1 16 6c0 8-7 14-16 20z"/>
+      </svg>
     </div>
     <div class="hero-eyebrow">우리 가족의 작은 기록</div>
-    <div class="hero-title">김정숙어머님을 위한<span class="amp">효도일기</span></div>
-    <p class="hero-sub">전화 한 통, 방문 한 번, 사진 한 장을 가족 모두가<br>이 페이지에 함께 남깁니다.</p>
-    <div class="hero-since" id="heroSince">기록 시작일 불러오는 중…</div>
-    <div class="scroll-cue"><span></span>아래로 내려보세요</div>
-  </div>
+    <div class="hero-title">효도일기<span class="amp">새로 만들기</span></div>
 
-  <section class="greeting">
-    <div class="section-title">인사말</div>
-    <div class="divider"></div>
-    <p>낳아주시고 길러주신 은혜, 말로 다 갚을 수 없지만<br>
-    작은 안부와 방문 하나하나를 이곳에 남기려 합니다.<br><br>
-    이 링크는 가족 누구나 로그인 없이 들어와서<br>
-    자유롭게 기록을 남기고 볼 수 있어요.</p>
-    <div class="signoff">— 가족 일동 드림</div>
-  </section>
-
-  <section class="dday">
-    <div class="section-title">함께한 시간</div>
-    <div class="divider"></div>
-    <div class="dday-number" id="ddayNumber">-</div>
-    <div class="dday-label">일째, 마음을 기록하고 있어요</div>
-    <div class="dday-start">기록 시작일 &nbsp;<input type="date" id="startDateInput"></div>
-  </section>
-
-  <section class="timeline">
-    <div class="section-title">효도 다이어리</div>
-    <div class="section-desc">전화, 방문, 식사, 병원 동행까지<br>김정숙어머님과 함께한 하루하루를 남겨요.</div>
-    <div class="timeline-list" id="timelineList"><div class="loading">불러오는 중…</div></div>
-  </section>
-
-  <section class="guestbook">
-    <div class="section-title">가족 한마디</div>
-    <div class="divider"></div>
-    <div class="gb-form">
-      <div class="gb-row">
-        <input type="text" id="gbName" placeholder="이름 (예: 큰딸, 막내)">
-        <input type="text" id="gbPin" placeholder="비밀번호 4자리" maxlength="4" inputmode="numeric" style="max-width:110px;">
-      </div>
-      <textarea id="gbMsg" placeholder="김정숙어머님께, 혹은 가족에게 남기는 한마디"></textarea>
-      <button class="btn" id="gbSubmit">남기기</button>
-    </div>
-    <div class="gb-note">* 이 방명록은 링크를 아는 가족 누구에게나 공개돼요. 삭제 시 작성할 때 쓴 비밀번호가 필요해요.</div>
-    <div class="gb-list" id="gbList"><div class="loading">불러오는 중…</div></div>
-  </section>
-
-  <div class="footer">
-    <div class="footer-title">오늘도, 감사합니다</div>
-    <p class="footer-text">이 페이지 링크를 가족에게 공유해<br>모두가 함께 기록을 이어갈 수 있어요.</p>
-    <button class="btn btn-outline" id="shareBtn">가족에게 링크 공유하기</button>
-    <div class="reset-link" id="resetLink">다이어리 기록 전체 초기화</div>
-  </div>
-
-  <button class="fab" id="fabAdd">＋</button>
-
-  <div class="modal-backdrop" id="modalBackdrop">
-    <div class="modal">
-      <button class="close-x" id="modalClose">×</button>
-      <h3 id="modalTitle">오늘의 기록 남기기</h3>
-      <div class="field-row">
-        <div class="field">
-          <span class="field-label">이름</span>
-          <input type="text" id="entryAuthor" placeholder="예: 큰아들">
-        </div>
-        <div class="field">
-          <span class="field-label">비밀번호 4자리</span>
-          <input type="text" id="entryPin" maxlength="4" inputmode="numeric" placeholder="수정·삭제용">
-        </div>
+    <div class="create-form">
+      <div class="field">
+        <span class="field-label">성함</span>
+        <input type="text" id="cfName" placeholder="예: 김정숙">
       </div>
       <div class="field">
-        <span class="field-label">날짜</span>
-        <input type="date" id="entryDate">
-      </div>
-      <div class="field">
-        <span class="field-label">어떤 시간이었나요</span>
-        <select id="entryTag">
-          <option value="전화">전화 통화</option>
-          <option value="방문">방문</option>
-          <option value="식사">함께 식사</option>
-          <option value="병원동행">병원 동행</option>
-          <option value="선물">선물 · 용돈</option>
-          <option value="기타">기타</option>
+        <span class="field-label">호칭</span>
+        <select id="cfRelation">
+          <option value="어머님">어머님</option>
+          <option value="아버님">아버님</option>
+          <option value="할머니">할머니</option>
+          <option value="할아버지">할아버지</option>
+          <option value="custom">직접 입력</option>
         </select>
-      </div>
-      <div class="field">
-        <span class="field-label">오늘의 기분</span>
-        <div class="mood-row" id="moodRow">
-          <button type="button" class="mood-btn" data-mood="😊">😊</button>
-          <button type="button" class="mood-btn" data-mood="🥰">🥰</button>
-          <button type="button" class="mood-btn" data-mood="🥲">🥲</button>
-          <button type="button" class="mood-btn" data-mood="😌">😌</button>
-          <button type="button" class="mood-btn" data-mood="🙏">🙏</button>
-        </div>
-      </div>
-      <div class="field">
-        <span class="field-label">내용</span>
-        <textarea id="entryText" placeholder="오늘 김정숙어머님과 나눈 이야기를 적어보세요"></textarea>
+        <input type="text" id="cfRelationCustom" placeholder="호칭을 입력해주세요" style="display:none; margin-top:8px;">
       </div>
       <div class="field">
         <span class="field-label">사진 (선택)</span>
-        <input type="file" id="entryPhoto" accept="image/*">
-        <div class="field-hint">용량이 큰 사진은 자동으로 거절돼요 (1.5MB 이하 권장)</div>
+        <input type="file" id="cfPhoto" accept="image/*">
+        <div class="field-hint">1.5MB 이하 사진 권장</div>
       </div>
-      <div class="modal-actions">
-        <button class="btn btn-outline" id="modalCancel">취소</button>
-        <button class="btn" id="modalSave">저장</button>
+      <div class="field">
+        <span class="field-label">기록 시작일</span>
+        <input type="date" id="cfStartDate">
       </div>
+      <button class="btn" id="cfSubmit">효도일기 시작하기</button>
     </div>
+
+    <p class="hero-sub" style="margin-top:26px;">이미 만든 효도일기가 있다면<br>가족에게 받은 링크로 들어와주세요.</p>
   </div>
 
-  <div class="modal-backdrop" id="pinBackdrop">
-    <div class="modal">
-      <button class="close-x" id="pinClose">×</button>
-      <h3>비밀번호 확인</h3>
-      <div class="field">
-        <span class="field-label">작성할 때 입력한 4자리 비밀번호</span>
-        <input type="text" id="pinCheckInput" maxlength="4" inputmode="numeric">
+  <!-- ===== 실제 효도일기 화면 (가족별로 내용이 달라져요) ===== -->
+  <div id="diaryApp" style="display:none;">
+
+    <div class="hero">
+      <div class="hero-frame">
+        <img id="heroPhoto" src="" alt="" style="display:none;">
+        <svg id="heroFallbackIcon" viewBox="0 0 64 64" fill="none" stroke="var(--persimmon-deep)" stroke-width="1.4">
+          <path d="M32 46c-9-6-16-12-16-20a9 9 0 0 1 16-6 9 9 0 0 1 16 6c0 8-7 14-16 20z"/>
+        </svg>
       </div>
-      <div class="modal-actions">
-        <button class="btn btn-outline" id="pinCancel">취소</button>
-        <button class="btn" id="pinConfirm">확인</button>
+      <div class="hero-eyebrow">우리 가족의 작은 기록</div>
+      <div class="hero-title" id="heroTitle">효도일기</div>
+      <p class="hero-sub">전화 한 통, 방문 한 번, 사진 한 장을 가족 모두가<br>이 페이지에 함께 남깁니다.</p>
+      <div class="hero-since" id="heroSince">기록 시작일 불러오는 중…</div>
+      <div class="scroll-cue"><span></span>아래로 내려보세요</div>
+    </div>
+
+    <section class="greeting">
+      <div class="section-title">인사말</div>
+      <div class="divider"></div>
+      <p>낳아주시고 길러주신 은혜, 말로 다 갚을 수 없지만<br>
+      작은 안부와 방문 하나하나를 이곳에 남기려 합니다.<br><br>
+      이 링크는 가족 누구나 로그인 없이 들어와서<br>
+      자유롭게 기록을 남기고 볼 수 있어요.</p>
+      <div class="signoff">— 가족 일동 드림</div>
+    </section>
+
+    <section class="dday">
+      <div class="section-title">함께한 시간</div>
+      <div class="divider"></div>
+      <div class="dday-number" id="ddayNumber">-</div>
+      <div class="dday-label">일째, 마음을 기록하고 있어요</div>
+      <div class="dday-start">기록 시작일 &nbsp;<input type="date" id="startDateInput"></div>
+    </section>
+
+    <section class="timeline">
+      <div class="section-title">효도 다이어리</div>
+      <div class="section-desc">전화, 방문, 식사, 병원 동행까지<br>함께한 하루하루를 남겨요.</div>
+      <div class="timeline-list" id="timelineList"><div class="loading">불러오는 중…</div></div>
+    </section>
+
+    <section class="guestbook">
+      <div class="section-title">가족 한마디</div>
+      <div class="divider"></div>
+      <div class="gb-form">
+        <div class="gb-row">
+          <input type="text" id="gbName" placeholder="이름 (예: 큰딸, 막내)">
+          <input type="text" id="gbPin" placeholder="비밀번호 4자리" maxlength="4" inputmode="numeric" style="max-width:110px;">
+        </div>
+        <textarea id="gbMsg" placeholder="가족에게, 혹은 이 다이어리의 주인공께 남기는 한마디"></textarea>
+        <button class="btn" id="gbSubmit">남기기</button>
+      </div>
+      <div class="gb-note">* 이 방명록은 링크를 아는 가족 누구에게나 공개돼요. 삭제 시 작성할 때 쓴 비밀번호가 필요해요.</div>
+      <div class="gb-list" id="gbList"><div class="loading">불러오는 중…</div></div>
+    </section>
+
+    <div class="footer">
+      <div class="footer-title">오늘도, 감사합니다</div>
+      <p class="footer-text">이 페이지 링크를 가족에게 공유해<br>모두가 함께 기록을 이어갈 수 있어요.</p>
+      <button class="btn btn-outline" id="shareBtn">가족에게 링크 공유하기</button>
+      <div class="reset-link" id="resetLink">이 다이어리 기록 전체 초기화</div>
+      <div class="reset-link" id="newFamilyLink">다른 분을 위한 효도일기 새로 만들기</div>
+    </div>
+
+    <button class="fab" id="fabAdd">＋</button>
+
+    <div class="modal-backdrop" id="modalBackdrop">
+      <div class="modal">
+        <button class="close-x" id="modalClose">×</button>
+        <h3 id="modalTitle">오늘의 기록 남기기</h3>
+        <div class="field-row">
+          <div class="field">
+            <span class="field-label">이름</span>
+            <input type="text" id="entryAuthor" placeholder="예: 큰아들">
+          </div>
+          <div class="field">
+            <span class="field-label">비밀번호 4자리</span>
+            <input type="text" id="entryPin" maxlength="4" inputmode="numeric" placeholder="수정·삭제용">
+          </div>
+        </div>
+        <div class="field">
+          <span class="field-label">날짜</span>
+          <input type="date" id="entryDate">
+        </div>
+        <div class="field">
+          <span class="field-label">어떤 시간이었나요</span>
+          <select id="entryTag">
+            <option value="전화">전화 통화</option>
+            <option value="방문">방문</option>
+            <option value="식사">함께 식사</option>
+            <option value="병원동행">병원 동행</option>
+            <option value="선물">선물 · 용돈</option>
+            <option value="기타">기타</option>
+          </select>
+        </div>
+        <div class="field">
+          <span class="field-label">오늘의 기분</span>
+          <div class="mood-row" id="moodRow">
+            <button type="button" class="mood-btn" data-mood="😊">😊</button>
+            <button type="button" class="mood-btn" data-mood="🥰">🥰</button>
+            <button type="button" class="mood-btn" data-mood="🥲">🥲</button>
+            <button type="button" class="mood-btn" data-mood="😌">😌</button>
+            <button type="button" class="mood-btn" data-mood="🙏">🙏</button>
+          </div>
+        </div>
+        <div class="field">
+          <span class="field-label">내용</span>
+          <textarea id="entryText" placeholder="오늘 나눈 이야기를 적어보세요"></textarea>
+        </div>
+        <div class="field">
+          <span class="field-label">사진 (선택)</span>
+          <input type="file" id="entryPhoto" accept="image/*">
+          <div class="field-hint">용량이 큰 사진은 자동으로 거절돼요 (1.5MB 이하 권장)</div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-outline" id="modalCancel">취소</button>
+          <button class="btn" id="modalSave">저장</button>
+        </div>
       </div>
     </div>
+
+    <div class="modal-backdrop" id="pinBackdrop">
+      <div class="modal">
+        <button class="close-x" id="pinClose">×</button>
+        <h3>비밀번호 확인</h3>
+        <div class="field">
+          <span class="field-label">작성할 때 입력한 4자리 비밀번호</span>
+          <input type="text" id="pinCheckInput" maxlength="4" inputmode="numeric">
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-outline" id="pinCancel">취소</button>
+          <button class="btn" id="pinConfirm">확인</button>
+        </div>
+      </div>
+    </div>
+
   </div>
+  <!-- /diaryApp -->
 
 </div>
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
   import {
-    getFirestore, collection, addDoc, updateDoc, deleteDoc, doc,
+    getFirestore, collection, addDoc, updateDoc, deleteDoc, setDoc, doc, getDoc,
     getDocs, query, orderBy
   } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
@@ -333,12 +396,21 @@
     document.getElementById("setupBanner").classList.add("show");
   }
 
+  let slug = null;
+  let familyData = null;
   let entries = [];
   let guestbook = [];
   let selectedMood = "";
   let editingEntryId = null;
   let pendingPinAction = null;
 
+  const createScreen = document.getElementById("createScreen");
+  const diaryApp = document.getElementById("diaryApp");
+  const notFoundNotice = document.getElementById("notFoundNotice");
+
+  const heroTitle = document.getElementById("heroTitle");
+  const heroPhoto = document.getElementById("heroPhoto");
+  const heroFallbackIcon = document.getElementById("heroFallbackIcon");
   const timelineList = document.getElementById("timelineList");
   const gbList = document.getElementById("gbList");
   const ddayNumber = document.getElementById("ddayNumber");
@@ -351,25 +423,110 @@
   }
   function todayStr(){ return new Date().toISOString().slice(0,10); }
   function escapeHtml(str){ const div = document.createElement("div"); div.textContent = str; return div.innerHTML; }
+  function generateSlug(){ return Math.random().toString(36).slice(2,8); }
 
-  async function loadAll(){
-    startDateInput.value = todayStr();
-    renderDday();
+  function famCol(name){ return collection(db, "families", slug, name); }
+  function famDoc(name, id){ return doc(db, "families", slug, name, id); }
 
-    if(!db){
-      timelineList.innerHTML = `<div class="empty-state">Firebase 연결 전이라 미리보기만 가능해요.</div>`;
-      gbList.innerHTML = `<div class="empty-state">Firebase 연결 전이라 미리보기만 가능해요.</div>`;
+  // ---------- 부팅: 링크에 ?f=가 있으면 그 가족 데이터를 불러오고, 없으면 생성 화면 ----------
+  async function boot(){
+    const params = new URLSearchParams(window.location.search);
+    slug = params.get("f");
+
+    if(!db || !slug){
+      createScreen.style.display = "flex";
+      diaryApp.style.display = "none";
       return;
     }
 
     try{
-      const q1 = query(collection(db, "diaryEntries"), orderBy("entryDate", "desc"));
+      const snap = await getDoc(doc(db, "families", slug));
+      if(!snap.exists()){
+        notFoundNotice.style.display = "block";
+        createScreen.style.display = "flex";
+        diaryApp.style.display = "none";
+        return;
+      }
+      familyData = snap.data();
+      createScreen.style.display = "none";
+      diaryApp.style.display = "block";
+      renderHero();
+      loadAll();
+    }catch(e){
+      console.error(e);
+      createScreen.style.display = "flex";
+      diaryApp.style.display = "none";
+    }
+  }
+
+  function renderHero(){
+    const name = familyData.name || "";
+    const relation = familyData.relation || "";
+    heroTitle.innerHTML = `${escapeHtml(name)} ${escapeHtml(relation)}<span class="amp">효도일기</span>`;
+    if(familyData.photoUrl){
+      heroPhoto.src = familyData.photoUrl;
+      heroPhoto.style.display = "block";
+      heroFallbackIcon.style.display = "none";
+    }
+    startDateInput.value = familyData.startDate || todayStr();
+    renderDday();
+  }
+
+  // ---------- 새 효도일기 만들기 폼 ----------
+  const cfName = document.getElementById("cfName");
+  const cfRelation = document.getElementById("cfRelation");
+  const cfRelationCustom = document.getElementById("cfRelationCustom");
+  const cfPhoto = document.getElementById("cfPhoto");
+  const cfStartDate = document.getElementById("cfStartDate");
+  const cfSubmit = document.getElementById("cfSubmit");
+
+  cfStartDate.value = todayStr();
+  cfRelation.addEventListener("change", () => {
+    cfRelationCustom.style.display = cfRelation.value === "custom" ? "block" : "none";
+  });
+
+  cfSubmit.onclick = async () => {
+    if(!db){ alert("Firebase 연결 전이라 만들 수 없어요."); return; }
+    const name = cfName.value.trim();
+    if(!name){ alert("성함을 입력해주세요."); return; }
+    const relation = cfRelation.value === "custom" ? cfRelationCustom.value.trim() : cfRelation.value;
+    const startDate = cfStartDate.value || todayStr();
+
+    const doCreate = async (photoDataUrl) => {
+      const newSlug = generateSlug();
+      await setDoc(doc(db, "families", newSlug), {
+        name, relation, startDate,
+        photoUrl: photoDataUrl || null,
+        createdAt: Date.now()
+      });
+      window.location.search = "?f=" + newSlug;
+    };
+
+    const file = cfPhoto.files[0];
+    if(file){
+      if(file.size > 1.5 * 1024 * 1024){
+        alert("사진 용량이 너무 커요. 1.5MB 이하 사진으로 선택해주세요.");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => doCreate(reader.result);
+      reader.onerror = () => doCreate(null);
+      reader.readAsDataURL(file);
+    } else {
+      doCreate(null);
+    }
+  };
+
+  // ---------- 다이어리 데이터 로딩 ----------
+  async function loadAll(){
+    try{
+      const q1 = query(famCol("diaryEntries"), orderBy("entryDate", "desc"));
       const snap1 = await getDocs(q1);
       entries = snap1.docs.map(d => ({ id: d.id, ...d.data() }));
     }catch(e){ console.error(e); entries = []; }
 
     try{
-      const q2 = query(collection(db, "guestbook"), orderBy("createdAt", "desc"));
+      const q2 = query(famCol("guestbook"), orderBy("createdAt", "desc"));
       const snap2 = await getDocs(q2);
       guestbook = snap2.docs.map(d => ({ id: d.id, ...d.data() }));
     }catch(e){ console.error(e); guestbook = []; }
@@ -473,7 +630,7 @@
   });
 
   document.getElementById("modalSave").onclick = async () => {
-    if(!db){ alert("Firebase 연결 전이라 저장은 안 돼요. 코드 상단 설정을 먼저 채워주세요."); return; }
+    if(!db){ alert("Firebase 연결 전이라 저장은 안 돼요."); return; }
     if(!entryAuthor.value.trim() || entryPin.value.trim().length !== 4 || !entryText.value.trim()){
       alert("이름, 4자리 비밀번호, 내용을 모두 입력해주세요.");
       return;
@@ -490,11 +647,11 @@
       if(photoDataUrl !== undefined) payload.photoUrl = photoDataUrl;
 
       if(editingEntryId){
-        await updateDoc(doc(db, "diaryEntries", editingEntryId), payload);
+        await updateDoc(famDoc("diaryEntries", editingEntryId), payload);
       } else {
         payload.photoUrl = photoDataUrl || null;
         payload.createdAt = Date.now();
-        await addDoc(collection(db, "diaryEntries"), payload);
+        await addDoc(famCol("diaryEntries"), payload);
       }
       closeModal();
       loadAll();
@@ -554,14 +711,14 @@
     if(kind === "entry"){
       if(type === "delete"){
         if(!confirm("이 기록을 삭제할까요?")) return;
-        await deleteDoc(doc(db, "diaryEntries", entry.id));
+        await deleteDoc(famDoc("diaryEntries", entry.id));
         loadAll();
       } else if(type === "edit"){
         openEditModal(entry);
       }
     } else if(kind === "guestbook"){
       if(!confirm("이 글을 삭제할까요?")) return;
-      await deleteDoc(doc(db, "guestbook", entry.id));
+      await deleteDoc(famDoc("guestbook", entry.id));
       loadAll();
     }
   };
@@ -575,7 +732,7 @@
       alert("이름, 4자리 비밀번호, 메시지를 모두 입력해주세요.");
       return;
     }
-    await addDoc(collection(db, "guestbook"), {
+    await addDoc(famCol("guestbook"), {
       authorName: nameEl.value.trim(),
       message: msgEl.value.trim(),
       pin: pinEl.value.trim(),
@@ -585,7 +742,12 @@
     loadAll();
   };
 
-  startDateInput.addEventListener("change", () => { renderDday(); });
+  startDateInput.addEventListener("change", async () => {
+    renderDday();
+    if(db && slug){
+      try{ await updateDoc(doc(db, "families", slug), { startDate: startDateInput.value }); }catch(e){ console.error(e); }
+    }
+  });
 
   document.getElementById("shareBtn").onclick = async () => {
     try{
@@ -597,14 +759,18 @@
   };
 
   document.getElementById("resetLink").onclick = async () => {
-    if(!db) return;
-    if(!confirm("가족 모두의 다이어리 기록을 전부 지울까요? 이 작업은 되돌릴 수 없어요.")) return;
-    const snap = await getDocs(collection(db, "diaryEntries"));
-    await Promise.all(snap.docs.map(d => deleteDoc(doc(db, "diaryEntries", d.id))));
+    if(!db || !slug) return;
+    if(!confirm("이 다이어리의 기록을 전부 지울까요? 이 작업은 되돌릴 수 없어요.")) return;
+    const snap = await getDocs(famCol("diaryEntries"));
+    await Promise.all(snap.docs.map(d => deleteDoc(famDoc("diaryEntries", d.id))));
     loadAll();
   };
 
-  loadAll();
+  document.getElementById("newFamilyLink").onclick = () => {
+    window.location.href = window.location.pathname;
+  };
+
+  boot();
 </script>
 </body>
 </html>
