@@ -74,8 +74,10 @@
     width:132px; height:132px; border-radius:50%;
     background: radial-gradient(circle at 35% 30%, #fff, var(--card) 55%, var(--paper-deep) 100%);
     border:1px solid var(--brass); display:flex; align-items:center; justify-content:center; margin-bottom:26px;
+    overflow:hidden;
   }
   .hero-frame svg{ width:58px; height:58px; opacity:0.75; }
+  .hero-frame img{ width:100%; height:100%; object-fit:cover; }
   .hero-eyebrow{ font-family: var(--font-display); font-size:15px; color:var(--ink-soft); letter-spacing:0.06em; margin-bottom:14px; }
   .hero-title{ font-family: var(--font-display); font-size:29px; line-height:1.55; font-weight:700; color:var(--ink); }
   .hero-title .amp{ display:block; font-size:16px; color:var(--persimmon); margin:6px 0; font-family: var(--font-body); }
@@ -175,12 +177,10 @@
 
   <div class="hero">
     <div class="hero-frame">
-      <svg viewBox="0 0 64 64" fill="none" stroke="var(--persimmon-deep)" stroke-width="1.4">
-        <path d="M32 46c-9-6-16-12-16-20a9 9 0 0 1 16-6 9 9 0 0 1 16 6c0 8-7 14-16 20z"/>
-      </svg>
+      <img src="grandmother.jpg" alt="김정숙어머님">
     </div>
     <div class="hero-eyebrow">우리 가족의 작은 기록</div>
-    <div class="hero-title">할머니를 위한<span class="amp">효도일기</span></div>
+    <div class="hero-title">김정숙어머님을 위한<span class="amp">효도일기</span></div>
     <p class="hero-sub">전화 한 통, 방문 한 번, 사진 한 장을 가족 모두가<br>이 페이지에 함께 남깁니다.</p>
     <div class="hero-since" id="heroSince">기록 시작일 불러오는 중…</div>
     <div class="scroll-cue"><span></span>아래로 내려보세요</div>
@@ -206,7 +206,7 @@
 
   <section class="timeline">
     <div class="section-title">효도 다이어리</div>
-    <div class="section-desc">전화, 방문, 식사, 병원 동행까지<br>할머니와 함께한 하루하루를 남겨요.</div>
+    <div class="section-desc">전화, 방문, 식사, 병원 동행까지<br>김정숙어머님과 함께한 하루하루를 남겨요.</div>
     <div class="timeline-list" id="timelineList"><div class="loading">불러오는 중…</div></div>
   </section>
 
@@ -218,7 +218,7 @@
         <input type="text" id="gbName" placeholder="이름 (예: 큰딸, 막내)">
         <input type="text" id="gbPin" placeholder="비밀번호 4자리" maxlength="4" inputmode="numeric" style="max-width:110px;">
       </div>
-      <textarea id="gbMsg" placeholder="할머니께, 혹은 가족에게 남기는 한마디"></textarea>
+      <textarea id="gbMsg" placeholder="김정숙어머님께, 혹은 가족에게 남기는 한마디"></textarea>
       <button class="btn" id="gbSubmit">남기기</button>
     </div>
     <div class="gb-note">* 이 방명록은 링크를 아는 가족 누구에게나 공개돼요. 삭제 시 작성할 때 쓴 비밀번호가 필요해요.</div>
@@ -275,7 +275,7 @@
       </div>
       <div class="field">
         <span class="field-label">내용</span>
-        <textarea id="entryText" placeholder="오늘 할머니와 나눈 이야기를 적어보세요"></textarea>
+        <textarea id="entryText" placeholder="오늘 김정숙어머님과 나눈 이야기를 적어보세요"></textarea>
       </div>
       <div class="field">
         <span class="field-label">사진 (선택)</span>
